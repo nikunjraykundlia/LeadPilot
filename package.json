@@ -6,7 +6,7 @@
   "scripts": {
     "start": "node server.js",
     "dev": "nodemon server.js",
-    "pm2:start": "pm2 start server.js --name leadpilot",
+    "pm2:start": "pm2 start ecosystem.config.js",
     "pm2:stop": "pm2 stop leadpilot",
     "pm2:restart": "pm2 restart leadpilot"
   },
