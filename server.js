@@ -127,27 +127,10 @@ async function extractContactInfoFromWebsite(url, visitInternalPages = true) {
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
     };
     
-    // Set executable path for production environments
+    // In production, use Puppeteer's bundled Chromium
     if (process.platform !== 'win32') {
-        // Try multiple possible Chromium paths
-        const possiblePaths = [
-            process.env.PUPPETEER_EXECUTABLE_PATH,
-            '/usr/bin/chromium-browser',
-            '/usr/bin/chromium',
-            '/snap/bin/chromium'
-        ].filter(Boolean);
-        
-        for (const path of possiblePaths) {
-            if (fs.existsSync(path)) {
-                launchOptions.executablePath = path;
-                break;
-            }
-        }
-        
-        if (!launchOptions.executablePath) {
-            console.error('❌ No Chromium installation found for contact extraction');
-            throw new Error('Chromium not found in production environment');
-        }
+        console.log('🔧 Using Puppeteer bundled Chromium for contact extraction');
+        // Don't set executablePath - let Puppeteer use its bundled Chromium
     }
     
     const browser = await puppeteer.launch(launchOptions);
@@ -333,28 +316,10 @@ async function scrapeGoogleMaps(searchQuery, targetCount, visitInternalPages = t
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
     };
     
-    // Set executable path for production environments
+    // In production, use Puppeteer's bundled Chromium
     if (process.platform !== 'win32') {
-        // Try multiple possible Chromium paths
-        const possiblePaths = [
-            process.env.PUPPETEER_EXECUTABLE_PATH,
-            '/usr/bin/chromium-browser',
-            '/usr/bin/chromium',
-            '/snap/bin/chromium'
-        ].filter(Boolean);
-        
-        for (const path of possiblePaths) {
-            if (fs.existsSync(path)) {
-                launchOptions.executablePath = path;
-                console.log(`🔧 Using Chromium at: ${path}`);
-                break;
-            }
-        }
-        
-        if (!launchOptions.executablePath) {
-            console.error('❌ No Chromium installation found. Please install chromium-browser');
-            throw new Error('Chromium not found in production environment');
-        }
+        console.log('🔧 Using Puppeteer bundled Chromium for production');
+        // Don't set executablePath - let Puppeteer use its bundled Chromium
     }
     
     console.log('🚀 Launching browser with options:', JSON.stringify(launchOptions, null, 2));
@@ -854,27 +819,10 @@ app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 LeadPilot System live at http://0.0.0.0:${PORT}`);
     console.log(`📁 Excel files stored in: ${EXCEL_DIR}`);
     
-    // Check Chromium availability in production
+    // Production environment info
     if (process.platform !== 'win32') {
-        const possiblePaths = [
-            process.env.PUPPETEER_EXECUTABLE_PATH,
-            '/usr/bin/chromium-browser',
-            '/usr/bin/chromium',
-            '/snap/bin/chromium'
-        ].filter(Boolean);
-        
-        let chromiumFound = false;
-        for (const path of possiblePaths) {
-            if (fs.existsSync(path)) {
-                console.log(`✅ Chromium found at: ${path}`);
-                chromiumFound = true;
-                break;
-            }
-        }
-        
-        if (!chromiumFound) {
-            console.error('❌ WARNING: No Chromium installation found! Scraping will fail.');
-            console.error('   Please ensure chromium-browser is installed in production.');
-        }
+        console.log('🔧 Production environment detected');
+        console.log('📦 Using Puppeteer bundled Chromium (no system installation required)');
+        console.log('✅ Ready for web scraping in production');
     }
 });

@@ -13,25 +13,11 @@ try {
     process.exit(1);
 }
 
-// For Render deployment - this will run on Linux
+// Skip system Chromium installation on Render (read-only filesystem)
 if (process.platform !== 'win32') {
-    console.log('Installing system Chromium...');
-    try {
-        execSync('apt-get update', { stdio: 'inherit' });
-        execSync('apt-get install -y chromium-browser', { stdio: 'inherit' });
-        console.log('Chromium installed successfully');
-        
-        // Verify Chromium installation
-        const chromiumPath = '/usr/bin/chromium-browser';
-        if (fs.existsSync(chromiumPath)) {
-            console.log(`✅ Chromium verified at: ${chromiumPath}`);
-        } else {
-            console.error('❌ Chromium not found at expected path');
-        }
-    } catch (error) {
-        console.error('Failed to install Chromium:', error.message);
-        process.exit(1);
-    }
+    console.log('📦 Production environment detected - using Puppeteer bundled Chromium');
+    console.log('ℹ️  System packages not installed due to read-only filesystem');
+    console.log('✅ Puppeteer will download its own Chromium binary');
 }
 
 console.log('Build completed successfully');
