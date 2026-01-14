@@ -10,6 +10,8 @@ An enhanced Google Maps scraper that extracts business information including con
 - 🔄 **Multi-Keyword Support**: Process multiple search queries in batch
 - 📈 **Real-time Progress**: Live status updates during scraping process
 - 🌐 **Internal Page Crawling**: Visit contact/about pages for better contact discovery
+- 🛡️ **Stealth Mode**: Advanced anti-detection capabilities for reliable scraping
+- 📱 **Responsive UI**: Modern web interface for easy operation
 
 ## Installation
 
@@ -29,7 +31,7 @@ npm run dev
 npm start
 ```
 
-The application will be available at `http://localhost:3000`
+The application will be available at `http://localhost:3000` 
 
 ## API Endpoints
 
@@ -61,37 +63,48 @@ The application will be available at `http://localhost:3000`
 
 ## Deployment
 
-### Render
-1. Connect your GitHub repository to Render
-2. Use these settings:
-   - **Build Command**: `npm install`
-   - **Start Command**: `node server.js`
-   - **Node Version**: 18 (LTS)
-   - **Port**: 3000
-
 ### PM2 (using provided script)
 ```bash
 ./start_pm2.bat
 ```
 
+### PM2 (manual)
+```bash
+npm run pm2:start    # Start the application
+npm run pm2:stop     # Stop the application
+npm run pm2:restart  # Restart the application
+```
+
 ## Dependencies
 
-- **Express** - Web server framework
-- **Puppeteer** - Headless browser automation
-- **Puppeteer Extra** - Enhanced Puppeteer functionality
-- **ExcelJS** - Excel file generation
-- **Body Parser** - Request parsing middleware
+- **Express** (v5.1.0) - Web server framework
+- **Puppeteer** (v21.5.0) - Headless browser automation
+- **Puppeteer Extra** (v3.3.6) - Enhanced Puppeteer functionality
+- **Puppeteer Extra Plugin Stealth** (v2.11.2) - Anti-detection plugin
+- **ExcelJS** (v4.4.0) - Excel file generation
+- **Body Parser** (v2.2.0) - Request parsing middleware
+- **PM2** (v5.3.0) - Process manager for production
 
 ## File Structure
 
 ```
 ├── server.js              # Main application server
 ├── package.json           # Dependencies and scripts
+├── ecosystem.config.js    # PM2 configuration
+├── build.js              # Build script
+├── build.sh              # Shell build script
+├── start_pm2.bat         # PM2 deployment script (Windows)
 ├── public/
 │   └── index.html         # Web interface
 ├── excel_files/           # Generated Excel files (auto-created)
-└── start_pm2.bat         # PM2 deployment script
+└── .env.render           # Environment variables (Render)
 ```
+
+## Configuration
+
+The application uses the following configuration files:
+- `ecosystem.config.js` - PM2 process management settings
+- `.env.render` - Environment variables for deployment
 
 ## Notes
 
@@ -99,6 +112,8 @@ The application will be available at `http://localhost:3000`
 - Scraping respects rate limits to avoid being blocked
 - Internal page crawling is limited to 3 pages per website for performance
 - Generated Excel files include timestamps for easy organization
+- Uses stealth technology to avoid detection by anti-bot systems
+- Supports Node.js version 16.0.0 and above
 
 ## License
 
