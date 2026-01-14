@@ -29,6 +29,9 @@ let processingState = {
     completedFiles: []
 };
 
+// Store scraped data in memory
+let scrapedData = {};
+
 // Ensure excel directory exists
 if (!fs.existsSync(EXCEL_DIR)) {
     fs.mkdirSync(EXCEL_DIR, { recursive: true });
@@ -465,8 +468,8 @@ if (!panel) {
     }
 }
 
-// Create Excel file
-async function createExcelFile(data, filename) {
+// Create Excel file in memory
+async function createExcelBuffer(data) {
     const workbook = new ExcelJS.Workbook();
     const worksheet = workbook.addWorksheet('Lead Data');
 
@@ -496,10 +499,8 @@ async function createExcelFile(data, filename) {
         worksheet.addRow(row);
     });
 
-    // Save file
-    const filepath = path.join(EXCEL_DIR, filename);
-    await workbook.xlsx.writeFile(filepath);
-    return filepath;
+    // Return buffer instead of saving to file
+    return workbook.xlsx.writeBuffer();
 }
 
 // 🌟 API Endpoints
@@ -591,12 +592,12 @@ app.post('/api/scrape', async (req, res) => {
                 // Scrape current keyword
                 const results = await scrapeGoogleMaps(keyword, parseInt(count), visitInternalPages);
 
-                // Generate filename for this keyword
-                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
-                const filename = `leads_${keyword.replace(/[^a-zA-Z0-9]/g, '_')}_${timestamp}_${Date.now()}.xlsx`;
+                // Store data in memory
+                scrapedData[keyword] = results;
 
-                // Create Excel file
-                await createExcelFile(results, filename);
+                // Generate filename for this keyword (for frontend display)
+                const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+                const filename = `leads_${keyword.replace(/[^a-zA-Z0-9]/g, '_')}_${timestamp}.xlsx`;
 
                 // Add to completed files
                 processingState.completedFiles.push({
@@ -609,7 +610,7 @@ app.post('/api/scrape', async (req, res) => {
                 // Mark keyword as processed
                 processingState.processedKeywords.push(keyword);
 
-                console.log(`✅ Completed keyword "${keyword}": ${results.length} results saved to ${filename}`);
+                console.log(`✅ Completed keyword "${keyword}": ${results.length} results stored in memory`);
 
             } catch (err) {
                 console.error(`❌ Error processing keyword "${keyword}": ${err.message}`);
@@ -683,31 +684,72 @@ app.get('/api/results/:processId', (req, res) => {
     });
 });
 
-// Get list of Excel files
+// Get available files (both memory and disk)
 app.get('/api/files', (req, res) => {
     try {
-        const files = fs.readdirSync(EXCEL_DIR)
+        // Get memory-based files
+        const memoryFiles = Object.keys(scrapedData).map(keyword => {
+            const completedFile = processingState.completedFiles.find(f => f.keyword === keyword);
+            return {
+                filename: completedFile?.filename || `leads_${keyword.replace(/[^a-zA-Z0-9]/g, '_')}.xlsx`,
+                keyword: keyword,
+                created: completedFile?.timestamp || new Date().toISOString(),
+                size: scrapedData[keyword].length * 1000, // Estimated size
+                type: 'memory',
+                resultCount: scrapedData[keyword].length
+            };
+        });
+
+        // Get disk-based files (legacy)
+        const diskFiles = fs.readdirSync(EXCEL_DIR)
             .filter(file => file.endsWith('.xlsx'))
             .map(file => {
                 const filepath = path.join(EXCEL_DIR, file);
                 const stats = fs.statSync(filepath);
                 return {
-                    name: file,
-                    size: (stats.size / 1024).toFixed(2) + ' KB',
-                    created: stats.birthtime.toISOString()
+                    filename: file,
+                    keyword: file.replace(/^leads_/, '').replace(/_\d{4}-\d{2}-\d{2}_.*\.xlsx$/, ''),
+                    created: stats.birthtime.toISOString(),
+                    size: stats.size,
+                    type: 'disk'
                 };
-            })
+            });
+
+        // Combine and sort
+        const allFiles = [...memoryFiles, ...diskFiles]
             .sort((a, b) => new Date(b.created) - new Date(a.created));
 
-        res.json(files);
+        res.json(allFiles);
     } catch (err) {
         console.error(`❌ Error reading files: ${err.message}`);
         res.status(500).json({ error: 'Error reading files' });
     }
 });
 
-// Download Excel file
-app.get('/api/download/:filename', (req, res) => {
+// Download Excel file from memory
+app.get('/api/download/:keyword', async (req, res) => {
+    const keyword = req.params.keyword;
+    
+    if (!scrapedData[keyword]) {
+        return res.status(404).json({ error: 'Data not found for this keyword' });
+    }
+
+    try {
+        const buffer = await createExcelBuffer(scrapedData[keyword]);
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+        const filename = `leads_${keyword.replace(/[^a-zA-Z0-9]/g, '_')}_${timestamp}.xlsx`;
+        
+        res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
+        res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+        res.send(buffer);
+    } catch (error) {
+        console.error('Error generating Excel file:', error);
+        res.status(500).json({ error: 'Error generating Excel file' });
+    }
+});
+
+// Legacy download endpoint (for backward compatibility)
+app.get('/api/download/file/:filename', (req, res) => {
     const filename = req.params.filename;
     const filepath = path.join(EXCEL_DIR, filename);
 
@@ -718,7 +760,27 @@ app.get('/api/download/:filename', (req, res) => {
     res.download(filepath, filename);
 });
 
-// Delete Excel file
+// Clear memory data
+app.delete('/api/memory/:keyword', (req, res) => {
+    const keyword = req.params.keyword;
+    
+    if (scrapedData[keyword]) {
+        delete scrapedData[keyword];
+        processingState.completedFiles = processingState.completedFiles.filter(f => f.keyword !== keyword);
+        res.json({ message: `Data for keyword "${keyword}" cleared from memory` });
+    } else {
+        res.status(404).json({ error: 'Data not found for this keyword' });
+    }
+});
+
+// Clear all memory data
+app.delete('/api/memory', (req, res) => {
+    scrapedData = {};
+    processingState.completedFiles = [];
+    res.json({ message: 'All memory data cleared' });
+});
+
+// Delete Excel file (legacy disk files)
 app.delete('/api/files/:filename', (req, res) => {
     const filename = req.params.filename;
     const filepath = path.join(EXCEL_DIR, filename);
@@ -729,7 +791,7 @@ app.delete('/api/files/:filename', (req, res) => {
 
     try {
         fs.unlinkSync(filepath);
-        res.json({ success: true, message: 'File deleted successfully' });
+        res.json({ message: 'File deleted successfully' });
     } catch (err) {
         console.error(`❌ Error deleting file: ${err.message}`);
         res.status(500).json({ error: 'Error deleting file' });
