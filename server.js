@@ -122,11 +122,17 @@ async function detectLeftPanel(page) {
 
 // 🟢 Enhanced contact extraction with internal pages
 async function extractContactInfoFromWebsite(url, visitInternalPages = true) {
-    const browser = await puppeteer.launch({
+    const launchOptions = {
         headless: "new",
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
-    });
+    };
+    
+    // Only set executablePath on Linux/Render environment
+    if (process.platform !== 'win32' && process.env.PUPPETEER_EXECUTABLE_PATH) {
+        launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+    }
+    
+    const browser = await puppeteer.launch(launchOptions);
 
     try {
         const page = await browser.newPage();
@@ -304,11 +310,17 @@ async function extractFromPage(page, url) {
 
 // 🟢 Scrape Google Maps businesses with enhanced contact extraction
 async function scrapeGoogleMaps(searchQuery, targetCount, visitInternalPages = true) {
-    const browser = await puppeteer.launch({
+    const launchOptions = {
         headless: "new",
-        executablePath: process.env.PUPPETEER_EXECUTABLE_PATH || '/usr/bin/chromium-browser',
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
-    });
+    };
+    
+    // Only set executablePath on Linux/Render environment
+    if (process.platform !== 'win32' && process.env.PUPPETEER_EXECUTABLE_PATH) {
+        launchOptions.executablePath = process.env.PUPPETEER_EXECUTABLE_PATH;
+    }
+    
+    const browser = await puppeteer.launch(launchOptions);
 
     try {
         const page = await browser.newPage();
@@ -614,6 +626,7 @@ app.post('/api/scrape', async (req, res) => {
 
             } catch (err) {
                 console.error(`❌ Error processing keyword "${keyword}": ${err.message}`);
+                console.error(`❌ Full error stack: ${err.stack}`);
 
                 // Mark as processed even if failed, to continue with next
                 processingState.processedKeywords.push(keyword);
