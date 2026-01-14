@@ -20,15 +20,18 @@ if (process.platform !== 'win32') {
         execSync('apt-get update', { stdio: 'inherit' });
         execSync('apt-get install -y chromium-browser', { stdio: 'inherit' });
         console.log('Chromium installed successfully');
+        
+        // Verify Chromium installation
+        const chromiumPath = '/usr/bin/chromium-browser';
+        if (fs.existsSync(chromiumPath)) {
+            console.log(`✅ Chromium verified at: ${chromiumPath}`);
+        } else {
+            console.error('❌ Chromium not found at expected path');
+        }
     } catch (error) {
         console.error('Failed to install Chromium:', error.message);
-        // Don't exit, as this might be already installed
+        process.exit(1);
     }
 }
-
-// Set environment variables
-process.env.PUPPETEER_EXECUTABLE_PATH = '/usr/bin/chromium-browser';
-process.env.PUPPETEER_SKIP_CHROMIUM_DOWNLOAD = 'true';
-process.env.PUPPETEER_SKIP_DOWNLOAD = 'true';
 
 console.log('Build completed successfully');
