@@ -100,6 +100,12 @@
                     >
                         <i class="fas fa-sync-alt mr-2"></i>Check Status
                     </button>
+                    <button 
+                        onclick="markAsFinished()"
+                        class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition duration-200"
+                    >
+                        <i class="fas fa-check-circle mr-2"></i>Mark as Finished
+                    </button>
                 </div>
             </div>
 
@@ -449,8 +455,19 @@
                         hideProcessingOverlay();
                         
                         const completedCount = status.completedFiles?.length || 0;
+                        const timeoutFiles = status.completedFiles?.filter(f => f.timeout) || [];
+                        const partialFiles = status.completedFiles?.filter(f => f.partial) || [];
+                        
                         if (completedCount > 0) {
-                            showMessage(`All keywords completed! Generated ${completedCount} Excel files.`, 'success');
+                            if (timeoutFiles.length > 0 && partialFiles.length > 0) {
+                                showMessage(`Process completed with issues! Generated ${completedCount} files (${timeoutFiles.length} timeout, ${partialFiles.length} partial).`, 'warning');
+                            } else if (timeoutFiles.length > 0) {
+                                showMessage(`Process completed with timeout! Generated ${completedCount} files (${timeoutFiles.length} with partial data due to timeout).`, 'warning');
+                            } else if (partialFiles.length > 0) {
+                                showMessage(`Process stopped! Generated ${completedCount} files (${partialFiles.length} with partial data).`, 'warning');
+                            } else {
+                                showMessage(`All keywords completed! Generated ${completedCount} Excel files.`, 'success');
+                            }
                         } else {
                             showMessage('Processing completed!', 'success');
                         }
@@ -471,8 +488,19 @@
                 if (!status.isProcessing) {
                     hideProcessingOverlay();
                     const completedCount = status.completedFiles?.length || 0;
+                    const timeoutFiles = status.completedFiles?.filter(f => f.timeout) || [];
+                    const partialFiles = status.completedFiles?.filter(f => f.partial) || [];
+                    
                     if (completedCount > 0) {
-                        showMessage(`All processes completed! Generated ${completedCount} files.`, 'success');
+                        if (timeoutFiles.length > 0 && partialFiles.length > 0) {
+                            showMessage(`Process completed with issues! Generated ${completedCount} files (${timeoutFiles.length} timeout, ${partialFiles.length} partial).`, 'warning');
+                        } else if (timeoutFiles.length > 0) {
+                            showMessage(`Process completed with timeout! Generated ${completedCount} files (${timeoutFiles.length} with partial data due to timeout).`, 'warning');
+                        } else if (partialFiles.length > 0) {
+                            showMessage(`Process stopped! Generated ${completedCount} files (${partialFiles.length} with partial data).`, 'warning');
+                        } else {
+                            showMessage(`All processes completed! Generated ${completedCount} files.`, 'success');
+                        }
                     } else {
                         showMessage('Process completed!', 'success');
                     }
@@ -486,6 +514,55 @@
                 }
             } catch (error) {
                 showMessage('Error checking status', 'error');
+            }
+        }
+
+        // Mark as finished - stop processing and generate Excel with current data
+        async function markAsFinished() {
+            try {
+                showMessage('Stopping process and generating files...', 'info');
+                
+                const response = await fetch('/api/finish', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                // Check if response is ok and contains JSON
+                const contentType = response.headers.get('content-type');
+                if (!response.ok || !contentType || !contentType.includes('application/json')) {
+                    // If we get HTML instead of JSON, it's likely an error page
+                    const text = await response.text();
+                    if (text.includes('<')) {
+                        throw new Error('Server returned HTML error page instead of JSON. The server may need to be restarted.');
+                    }
+                    throw new Error(`Server error: ${response.status} ${response.statusText}`);
+                }
+
+                const result = await response.json();
+
+                if (result.success) {
+                    clearInterval(statusCheckInterval);
+                    hideProcessingOverlay();
+                    
+                    const completedCount = result.completedFiles?.length || 0;
+                    if (completedCount > 0) {
+                        showMessage(`Process stopped! Generated ${completedCount} files with processed data.`, 'success');
+                    } else {
+                        showMessage('Process stopped! No data was processed.', 'info');
+                    }
+                    loadFiles(); // Refresh files list
+                } else {
+                    throw new Error(result.error || 'Failed to stop process');
+                }
+            } catch (error) {
+                console.error('Mark as finished error:', error);
+                if (error.message.includes('HTML error page')) {
+                    showMessage('Server error detected. Please restart the server and try again.', 'error');
+                } else {
+                    showMessage(`Error stopping process: ${error.message}`, 'error');
+                }
             }
         }
 
@@ -582,10 +659,14 @@
                                     <i class="fas fa-file-excel text-green-600 mr-2"></i>
                                     ${file.filename}
                                     ${file.type === 'memory' ? '<span class="ml-2 text-xs bg-blue-100 text-blue-800 px-2 py-1 rounded">In Memory</span>' : ''}
+                                    ${file.timeout ? '<span class="ml-2 text-xs bg-yellow-100 text-yellow-800 px-2 py-1 rounded"><i class="fas fa-exclamation-triangle mr-1"></i>Timeout</span>' : ''}
+                                    ${file.partial ? '<span class="ml-2 text-xs bg-orange-100 text-orange-800 px-2 py-1 rounded"><i class="fas fa-stop-circle mr-1"></i>Partial</span>' : ''}
                                 </div>
                                 <div class="text-sm text-gray-600">
                                     ${file.keyword ? `<span class="mr-4"><i class="fas fa-keyword mr-1"></i>Keyword: ${file.keyword}</span>` : ''}
                                     ${file.resultCount ? `<span class="mr-4"><i class="fas fa-database mr-1"></i>${file.resultCount} records</span>` : ''}
+                                    ${file.timeout ? `<span class="mr-4 text-yellow-600"><i class="fas fa-exclamation-triangle mr-1"></i>Partial data (timeout)</span>` : ''}
+                                    ${file.partial ? `<span class="mr-4 text-orange-600"><i class="fas fa-stop-circle mr-1"></i>Partial data (stopped)</span>` : ''}
                                     <span class="mr-4">
                                         <i class="fas fa-weight mr-1"></i>
                                         ${file.type === 'memory' ? '~' + Math.round(file.size / 1024) + ' KB' : Math.round(file.size / 1024) + ' KB'}

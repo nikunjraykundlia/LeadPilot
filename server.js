@@ -29,6 +29,9 @@ let processingState = {
     completedFiles: []
 };
 
+// Global stop flag for immediate process termination
+let stopProcessing = false;
+
 // Store scraped data in memory
 let scrapedData = {};
 
@@ -122,6 +125,12 @@ async function detectLeftPanel(page) {
 
 // 🟢 Enhanced contact extraction with internal pages
 async function extractContactInfoFromWebsite(url, visitInternalPages = true) {
+    // Check if processing was stopped
+    if (stopProcessing || !processingState.isProcessing) {
+        console.log('🛑 Contact extraction stopped by user request');
+        return { emails: [], facebook: [], instagram: [] };
+    }
+
     const launchOptions = {
         headless: "new",
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
@@ -146,8 +155,22 @@ async function extractContactInfoFromWebsite(url, visitInternalPages = true) {
             else req.continue();
         });
 
+        // Check if processing was stopped during page setup
+        if (stopProcessing || !processingState.isProcessing) {
+            console.log('🛑 Contact extraction stopped during page setup');
+            await browser.close();
+            return { emails: [], facebook: [], instagram: [] };
+        }
+
         // Extract from homepage
         let contactInfo = await extractFromPage(page, url);
+
+        // Check if processing was stopped after homepage extraction
+        if (stopProcessing || !processingState.isProcessing) {
+            console.log('🛑 Contact extraction stopped after homepage extraction');
+            await browser.close();
+            return contactInfo;
+        }
 
         // If no contacts found and visitInternalPages is true, try internal pages
         if (visitInternalPages && (contactInfo.emails.length === 0 || contactInfo.facebook.length === 0 || contactInfo.instagram.length === 0)) {
@@ -155,6 +178,12 @@ async function extractContactInfoFromWebsite(url, visitInternalPages = true) {
 
             const internalPages = await findInternalPages(page, url);
             for (const internalUrl of internalPages.slice(0, 3)) { // Limit to 3 internal pages
+                // Check if processing was stopped before each internal page
+                if (stopProcessing || !processingState.isProcessing) {
+                    console.log('🛑 Contact extraction stopped before internal page processing');
+                    break;
+                }
+
                 try {
                     console.log(`🌐 Checking internal page: ${internalUrl}`);
                     const internalInfo = await extractFromPage(page, internalUrl);
@@ -210,11 +239,29 @@ async function findInternalPages(page, baseUrl) {
 // Extract contact info from a specific page
 async function extractFromPage(page, url) {
     try {
+        // Check if processing was stopped
+        if (stopProcessing || !processingState.isProcessing) {
+            console.log('🛑 Page extraction stopped by user request');
+            return { emails: [], facebook: [], instagram: [] };
+        }
+
         console.log(`🔍 Extracting contacts from: ${url}`);
         await page.goto(url, { waitUntil: 'domcontentloaded', timeout: 60000 });
 
+        // Check if processing was stopped after page load
+        if (stopProcessing || !processingState.isProcessing) {
+            console.log('🛑 Page extraction stopped after page load');
+            return { emails: [], facebook: [], instagram: [] };
+        }
+
         // Wait for dynamic content to load
         await new Promise(resolve => setTimeout(resolve, 5000));
+
+        // Check if processing was stopped during content wait
+        if (stopProcessing || !processingState.isProcessing) {
+            console.log('🛑 Page extraction stopped during content wait');
+            return { emails: [], facebook: [], instagram: [] };
+        }
 
         // Try to scroll to trigger lazy loading
         await page.evaluate(() => {
@@ -223,6 +270,12 @@ async function extractFromPage(page, url) {
 
         // Wait a bit more after scrolling
         await new Promise(resolve => setTimeout(resolve, 3000));
+
+        // Check if processing was stopped after scrolling
+        if (stopProcessing || !processingState.isProcessing) {
+            console.log('🛑 Page extraction stopped after scrolling');
+            return { emails: [], facebook: [], instagram: [] };
+        }
 
         const html = await page.content();
         console.log(`📄 Page content length: ${html.length} characters`);
@@ -390,6 +443,36 @@ if (!panel) {
 
         const results = [];
         for (let i = 0; i < Math.min(businesses.length, targetCount); i++) {
+            // Check if processing was stopped
+            if (stopProcessing || !processingState.isProcessing) {
+                console.log('🛑 Business processing stopped by user request');
+                
+                // Save the current results immediately if we have data
+                if (results.length > 0) {
+                    console.log(`💾 Saving ${results.length} businesses for keyword: ${searchQuery}`);
+                    scrapedData[searchQuery] = results;
+                    
+                    // Generate filename for this keyword
+                    const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+                    const filename = `leads_${searchQuery.replace(/[^a-zA-Z0-9]/g, '_')}_${timestamp}.xlsx`;
+
+                    // Add to completed files with partial indicator
+                    processingState.completedFiles.push({
+                        keyword: searchQuery,
+                        filename: filename,
+                        resultCount: results.length,
+                        partial: true,
+                        timestamp: new Date().toISOString()
+                    });
+
+                    // Mark keyword as processed
+                    if (!processingState.processedKeywords.includes(searchQuery)) {
+                        processingState.processedKeywords.push(searchQuery);
+                    }
+                }
+                break;
+            }
+
             const business = businesses[i];
             console.log(`🔍 Processing ${i + 1}/${targetCount}: ${business.name}`);
 
@@ -428,6 +511,34 @@ if (!panel) {
                     };
                 });
 
+                // Check if processing was stopped during business details extraction
+                if (stopProcessing || !processingState.isProcessing) {
+                    console.log('🛑 Processing stopped during business details extraction');
+                    await mapPage.close();
+                    
+                    // Save current results before breaking
+                    if (results.length > 0) {
+                        console.log(`💾 Saving ${results.length} businesses for keyword: ${searchQuery}`);
+                        scrapedData[searchQuery] = results;
+                        
+                        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+                        const filename = `leads_${searchQuery.replace(/[^a-zA-Z0-9]/g, '_')}_${timestamp}.xlsx`;
+
+                        processingState.completedFiles.push({
+                            keyword: searchQuery,
+                            filename: filename,
+                            resultCount: results.length,
+                            partial: true,
+                            timestamp: new Date().toISOString()
+                        });
+
+                        if (!processingState.processedKeywords.includes(searchQuery)) {
+                            processingState.processedKeywords.push(searchQuery);
+                        }
+                    }
+                    break;
+                }
+
                 // Extract contact info from website if available
                 let contactInfo = { emails: [], facebook: [], instagram: [] };
                 if (website) {
@@ -460,6 +571,16 @@ if (!panel) {
                 await mapPage.close();
             } catch (err) {
                 console.log(`⚠️ Error processing ${business.name}: ${err.message}`);
+                
+                // Check for specific timeout error
+                if (err.message && err.message.includes('Target.createTarget timed out')) {
+                    console.log(`🔍 Timeout error detected for ${business.name}. Completing process gracefully...`);
+                    
+                    // Store current results and mark as completed due to timeout
+                    // This will trigger graceful completion in the main processing loop
+                    throw new Error(`TIMEOUT_DETECTED: ${err.message}`);
+                }
+                
                 results.push({
                     name: business.name,
                     maps_link: business.link,
@@ -570,6 +691,7 @@ app.post('/api/scrape', async (req, res) => {
     }
 
     // Set processing state for multiple keywords
+    stopProcessing = false; // Reset stop flag
     processingState.isProcessing = true;
     processingState.currentKeywords = [...keywords];
     processingState.processedKeywords = [];
@@ -598,6 +720,12 @@ app.post('/api/scrape', async (req, res) => {
         for (let i = 0; i < keywords.length; i++) {
             const keyword = keywords[i];
 
+            // Check if processing was stopped
+            if (stopProcessing || !processingState.isProcessing) {
+                console.log('🛑 Processing was stopped by user request');
+                break;
+            }
+
             // Update current processing state
             processingState.currentKeywordIndex = i;
             processingState.currentQuery = keyword;
@@ -607,6 +735,12 @@ app.post('/api/scrape', async (req, res) => {
             try {
                 // Scrape current keyword
                 const results = await scrapeGoogleMaps(keyword, parseInt(count), visitInternalPages);
+
+                // Check if processing was stopped during scraping
+                if (stopProcessing || !processingState.isProcessing) {
+                    console.log('🛑 Processing was stopped during scraping');
+                    break;
+                }
 
                 // Store data in memory
                 scrapedData[keyword] = results;
@@ -631,6 +765,39 @@ app.post('/api/scrape', async (req, res) => {
             } catch (err) {
                 console.error(`❌ Error processing keyword "${keyword}": ${err.message}`);
                 console.error(`❌ Full error stack: ${err.stack}`);
+
+                // Check if this is a timeout error that should trigger graceful completion
+                if (err.message && err.message.includes('TIMEOUT_DETECTED:')) {
+                    console.log(`🔍 Timeout detected for "${keyword}". Storing partial results and completing process...`);
+                    
+                    // Store whatever results we have so far
+                    if (results && results.length > 0) {
+                        scrapedData[keyword] = results;
+                        
+                        // Generate filename for this keyword (for frontend display)
+                        const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
+                        const filename = `leads_${keyword.replace(/[^a-zA-Z0-9]/g, '_')}_${timestamp}.xlsx`;
+
+                        // Add to completed files with timeout indicator
+                        processingState.completedFiles.push({
+                            keyword: keyword,
+                            filename: filename,
+                            resultCount: results.length,
+                            timeout: true,
+                            error: 'Process timed out gracefully',
+                            timestamp: new Date().toISOString()
+                        });
+
+                        console.log(`✅ Partial results for "${keyword}" stored: ${results.length} businesses (timeout)`);
+                    }
+                    
+                    // Mark keyword as processed
+                    processingState.processedKeywords.push(keyword);
+                    
+                    // Break out of the loop to stop processing remaining keywords
+                    console.log(`🛑 Stopping remaining keyword processing due to timeout`);
+                    break;
+                }
 
                 // Mark as processed even if failed, to continue with next
                 processingState.processedKeywords.push(keyword);
@@ -668,6 +835,54 @@ app.post('/api/scrape', async (req, res) => {
         processingState.currentCount = 0;
         processingState.startTime = null;
         processingState.processId = null;
+    }
+});
+
+// Stop processing and generate files with current data
+app.post('/api/finish', async (req, res) => {
+    if (!processingState.isProcessing) {
+        return res.status(400).json({ error: 'No active process to stop' });
+    }
+
+    try {
+        console.log('🛑 Manual finish requested - stopping process immediately...');
+        
+        // Set the global stop flag to immediately terminate processing
+        stopProcessing = true;
+        
+        // Wait a moment for any current processing to complete and save data
+        await new Promise(resolve => setTimeout(resolve, 2000));
+        
+        processingState.isProcessing = false;
+        
+        const processedKeywords = [...processingState.processedKeywords];
+        console.log(`📊 Processing stopped. Processed keywords: ${processedKeywords.join(', ')}`);
+        
+        // Generate completion response
+        const completedFiles = processingState.completedFiles || [];
+        
+        res.json({
+            success: true,
+            message: 'Process stopped successfully',
+            completedFiles: completedFiles,
+            processedKeywords: processedKeywords
+        });
+
+    } catch (error) {
+        console.error('❌ Error stopping process:', error);
+        
+        // Clear processing state on error
+        processingState.isProcessing = false;
+        stopProcessing = false;
+        processingState.currentKeywords = [];
+        processingState.processedKeywords = [];
+        processingState.currentKeywordIndex = 0;
+        processingState.currentQuery = '';
+        processingState.currentCount = 0;
+        processingState.startTime = null;
+        processingState.processId = null;
+        
+        res.status(500).json({ error: 'Error stopping process' });
     }
 });
 
