@@ -72,12 +72,6 @@ npm run pm2:stop
 npm run pm2:restart
 ```
 
-### Quick Start (Windows)
-```bash
-# Use the provided batch script
-./start_pm2.bat
-```
-
 The application will be available at `http://localhost:3000` 
 
 ## 🔌 API Endpoints
@@ -89,27 +83,6 @@ The application will be available at `http://localhost:3000`
 - `GET /api/files` - List all generated Excel files
 - `GET /api/download/:filename` - Download specific Excel file
 - `DELETE /api/files/:filename` - Delete specific Excel file
-
-### API Request Format
-```json
-POST /api/scrape
-{
-  "keywords": ["restaurants in New York", "cafes in London"],
-  "count": 50
-}
-```
-
-### API Response Format
-```json
-{
-  "status": "processing|completed|idle",
-  "progress": 75,
-  "currentKeyword": "restaurants in New York",
-  "processedCount": 35,
-  "totalCount": 50,
-  "message": "Processing business listings..."
-}
-```
 
 ## 🔄 Scraping Process
 
@@ -135,35 +108,6 @@ POST /api/scrape
 - **Facebook Profiles** - Business Facebook pages
 - **Instagram Profiles** - Business Instagram accounts
 - **Additional Social Media** - Other discovered social profiles
-
-## 🚀 Deployment
-
-### Local Development
-```bash
-# Install dependencies
-npm install
-
-# Start development server
-npm run dev
-```
-
-### Production Deployment
-
-#### PM2 (Recommended)
-```bash
-# Using provided script (Windows)
-./start_pm2.bat
-
-# Manual PM2 commands
-npm run pm2:start    # Start the application
-npm run pm2:stop     # Stop the application
-npm run pm2:restart  # Restart the application
-```
-
-#### Direct Node.js
-```bash
-npm start
-```
 
 ## 📦 Dependencies
 
