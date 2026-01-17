@@ -5,14 +5,13 @@ A sophisticated Google Maps scraper that extracts comprehensive business informa
 ## 🚀 Features
 
 - 🗺️ **Advanced Google Maps Scraping**: Extract business listings with high accuracy using intelligent detection
-- 📧 **Intelligent Contact Extraction**: Automatically extract emails, Facebook, and Instagram links from business websites
+- 📧 **Intelligent Contact Extraction**: Automatically extract emails, Facebook, and Instagram links from websites
 - 📊 **Professional Excel Export**: Generate formatted Excel files with all extracted data and timestamps
 - 🔄 **Batch Processing**: Process multiple search queries simultaneously with progress tracking
 - 📈 **Real-time Monitoring**: Live status updates, progress bars, and detailed processing information
 - 🌐 **Deep Website Crawling**: Visit contact/about pages for comprehensive contact discovery
 - 🛡️ **Advanced Anti-Detection**: Stealth mode with Puppeteer Extra for reliable scraping
 - 📱 **Modern Web Interface**: Responsive UI with Tailwind CSS and real-time updates
-- ⚡ **High Performance**: Optimized scraping with configurable limits and error handling
 - 🎯 **Smart Data Validation**: Automatic data cleaning and validation before export
 
 ## 🛠️ Technology Stack
