@@ -24,6 +24,7 @@ let processingState = {
     currentCount: 0,
     totalTargetCount: 0,
     currentBusinessCount: 0,
+    currentBusinessName: '',
     startTime: null,
     processId: null,
     completedFiles: []
@@ -475,6 +476,9 @@ if (!panel) {
 
             const business = businesses[i];
             console.log(`🔍 Processing ${i + 1}/${targetCount}: ${business.name}`);
+            
+            // Update current business name in processing state
+            processingState.currentBusinessName = business.name;
 
             try {
                 const mapPage = await browser.newPage();
@@ -658,6 +662,7 @@ app.get('/api/status', (req, res) => {
         currentCount: processingState.currentCount,
         totalTargetCount: processingState.totalTargetCount,
         currentBusinessCount: processingState.currentBusinessCount,
+        currentBusinessName: processingState.currentBusinessName,
         startTime: processingState.startTime,
         processId: processingState.processId,
         completedFiles: processingState.completedFiles,
@@ -820,6 +825,7 @@ app.post('/api/scrape', async (req, res) => {
         processingState.currentKeywordIndex = 0;
         processingState.currentQuery = '';
         processingState.currentCount = 0;
+        processingState.currentBusinessName = '';
         processingState.startTime = null;
         processingState.processId = null;
 
@@ -833,6 +839,7 @@ app.post('/api/scrape', async (req, res) => {
         processingState.currentKeywordIndex = 0;
         processingState.currentQuery = '';
         processingState.currentCount = 0;
+        processingState.currentBusinessName = '';
         processingState.startTime = null;
         processingState.processId = null;
     }
@@ -879,6 +886,7 @@ app.post('/api/finish', async (req, res) => {
         processingState.currentKeywordIndex = 0;
         processingState.currentQuery = '';
         processingState.currentCount = 0;
+        processingState.currentBusinessName = '';
         processingState.startTime = null;
         processingState.processId = null;
         
@@ -1031,7 +1039,7 @@ app.delete('/api/files/:filename', (req, res) => {
 });
 
 app.listen(PORT, '0.0.0.0', () => {
-    console.log(`🚀 LeadPilot System live at http://0.0.0.0:${PORT}`);
+    console.log(`🚀 LeadPilot System live at http://localhost:3000`);
     console.log(`📁 Excel files stored in: ${EXCEL_DIR}`);
     
     // Production environment info

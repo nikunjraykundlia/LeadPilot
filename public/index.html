@@ -81,11 +81,14 @@
                     <!-- Current Processing Info -->
                     <div class="mb-4">
                         <p class="text-sm text-gray-600 mb-2">
-                            <span id="progressCounter">0 / 0</span> keywords completed
+                            <span id="progressCounter">0 / 0</span> businesses completed
                             • <span id="elapsedTime">0s</span> elapsed
                         </p>
                         <p class="text-sm font-semibold text-blue-600">
                             Currently processing: <span id="currentProcessQuery">""</span>
+                        </p>
+                        <p class="text-sm text-gray-500 mt-1">
+                            Business: <span id="currentBusinessName" class="font-medium">-</span>
                         </p>
                     </div>
                     
@@ -366,11 +369,13 @@
             const progress = status.progress || 0;
             const currentBusinessCount = status.currentBusinessCount || 0;
             const totalTargetCount = status.totalTargetCount || 0;
+            const currentBusinessName = status.currentBusinessName || '';
             
             document.getElementById('keywordProgressBar').style.width = `${progress}%`;
             document.getElementById('progressCounter').textContent = `${currentBusinessCount} / ${totalTargetCount} businesses`;
             document.getElementById('elapsedTime').textContent = formatElapsedTime(status.elapsed || 0);
             document.getElementById('currentProcessQuery').textContent = `"${status.currentQuery || ''}"`;
+            document.getElementById('currentBusinessName').textContent = currentBusinessName || '-';
             
             // Update keywords status list
             updateKeywordsStatusList(status);
