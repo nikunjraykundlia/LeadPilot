@@ -108,7 +108,7 @@ async function detectLeftPanel(page) {
     console.log("❌ Left panel NOT detected. Retrying in 3 seconds...");
 
     // 3️⃣ Retry logic (Google Maps sometimes loads slow)
-    await page.waitForTimeout(3000);
+    await page.waitForDelay(3000);
 
     for (const selector of knownSelectors) {
         const found = await page.$(selector);
