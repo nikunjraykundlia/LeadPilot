@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -10,47 +11,65 @@
         .gradient-bg {
             background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
         }
+
         .glass-effect {
             background: rgba(255, 255, 255, 0.95);
             backdrop-filter: blur(10px);
             border: 1px solid rgba(255, 255, 255, 0.2);
         }
+
         .progress-bar {
             transition: width 0.3s ease;
         }
+
         .animate-spin-slow {
             animation: spin 2s linear infinite;
         }
+
         .animate-pulse-slow {
             animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
         }
+
         @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(20px); }
-            to { opacity: 1; transform: translateY(0); }
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
         }
+
         .fade-in {
             animation: fadeIn 0.5s ease-out;
         }
+
         .table-row:hover {
             background-color: #f8fafc;
             transform: translateX(2px);
             transition: all 0.2s ease;
         }
+
         .keyword-tag {
             background: linear-gradient(135deg, #60a5fa 0%, #3b82f6 100%);
             transform: scale(1);
             transition: all 0.2s ease;
         }
+
         .keyword-tag:hover {
             transform: scale(1.05);
             box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
         }
+
         .processing-overlay {
             background: rgba(0, 0, 0, 0.1);
             backdrop-filter: blur(2px);
         }
     </style>
 </head>
+
 <body class="gradient-bg min-h-screen">
     <div class="container mx-auto px-4 py-8">
         <!-- Header -->
@@ -64,20 +83,23 @@
 
         <!-- Main Card -->
         <div class="glass-effect rounded-2xl shadow-2xl p-8 mb-8 fade-in relative">
-            
+
             <!-- Processing Overlay -->
-            <div id="processingOverlay" class="absolute inset-0 processing-overlay rounded-2xl hidden items-center justify-center z-10">
+            <div id="processingOverlay"
+                class="absolute inset-0 processing-overlay rounded-2xl hidden items-center justify-center z-10">
                 <div class="bg-white rounded-lg p-6 shadow-lg text-center max-w-lg">
                     <div class="animate-spin-slow mb-4">
                         <i class="fas fa-cog text-4xl text-blue-500"></i>
                     </div>
                     <h3 class="text-lg font-bold text-gray-800 mb-3">Processing Keywords</h3>
-                    
+
                     <!-- Progress Bar -->
                     <div class="w-full bg-gray-200 rounded-full h-3 mb-4">
-                        <div id="keywordProgressBar" class="bg-gradient-to-r from-green-400 to-blue-500 h-3 rounded-full transition-all duration-500" style="width: 0%"></div>
+                        <div id="keywordProgressBar"
+                            class="bg-gradient-to-r from-green-400 to-blue-500 h-3 rounded-full transition-all duration-500"
+                            style="width: 0%"></div>
                     </div>
-                    
+
                     <!-- Current Processing Info -->
                     <div class="mb-4">
                         <p class="text-sm text-gray-600 mb-2">
@@ -87,26 +109,19 @@
                         <p class="text-sm font-semibold text-blue-600">
                             Currently processing: <span id="currentProcessQuery">""</span>
                         </p>
-                        <p class="text-sm text-gray-500 mt-1">
-                            Business: <span id="currentBusinessName" class="font-medium">-</span>
-                        </p>
                     </div>
-                    
+
                     <!-- Keywords Status List -->
                     <div id="keywordsStatusList" class="text-left max-h-32 overflow-y-auto mb-4">
                         <!-- Keywords status will be populated here -->
                     </div>
-                    
-                    <button 
-                        onclick="checkResults()"
-                        class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition duration-200"
-                    >
+
+                    <button onclick="checkResults()"
+                        class="bg-blue-500 text-white px-4 py-2 rounded-lg hover:bg-blue-600 transition duration-200">
                         <i class="fas fa-sync-alt mr-2"></i>Check Status
                     </button>
-                    <button 
-                        onclick="markAsFinished()"
-                        class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition duration-200"
-                    >
+                    <button onclick="markAsFinished()"
+                        class="bg-green-500 text-white px-4 py-2 rounded-lg hover:bg-green-600 transition duration-200">
                         <i class="fas fa-check-circle mr-2"></i>Mark as Finished
                     </button>
                 </div>
@@ -117,26 +132,23 @@
                 <label class="block text-gray-700 font-semibold mb-3">
                     <i class="fas fa-tags mr-2"></i>Search Keywords
                 </label>
-                
+
                 <!-- Keywords Input -->
                 <div class="flex gap-2 mb-3">
-                    <input 
-                        type="text" 
-                        id="keywordInput" 
+                    <input type="text" id="keywordInput"
                         placeholder="Enter keyword and press Enter (e.g., restaurants in New York)"
-                        class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200"
-                    >
-                    <button 
-                        id="addKeywordBtn"
-                        class="bg-blue-500 text-white px-4 py-3 rounded-lg hover:bg-blue-600 transition duration-200"
-                    >
+                        class="flex-1 px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200">
+                    <button id="addKeywordBtn"
+                        class="bg-blue-500 text-white px-4 py-3 rounded-lg hover:bg-blue-600 transition duration-200">
                         <i class="fas fa-plus"></i>
                     </button>
                 </div>
-                
+
                 <!-- Keywords Display -->
-                <div id="keywordsList" class="flex flex-wrap gap-2 min-h-[40px] p-3 border border-gray-200 rounded-lg bg-gray-50">
-                    <span class="text-gray-500 text-sm" id="keywordsPlaceholder">Add keywords by typing and pressing Enter...</span>
+                <div id="keywordsList"
+                    class="flex flex-wrap gap-2 min-h-[40px] p-3 border border-gray-200 rounded-lg bg-gray-50">
+                    <span class="text-gray-500 text-sm" id="keywordsPlaceholder">Add keywords by typing and pressing
+                        Enter...</span>
                 </div>
             </div>
 
@@ -146,15 +158,8 @@
                     <label class="block text-gray-700 font-semibold mb-2">
                         <i class="fas fa-hashtag mr-2"></i>Target Count (per keyword)
                     </label>
-                    <input 
-                        type="number" 
-                        id="targetCount" 
-                        placeholder="50"
-                        value="50"
-                        min="1"
-                        max="500"
-                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200"
-                    >
+                    <input type="number" id="targetCount" placeholder="50" value="50" min="1" max="500"
+                        class="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent transition duration-200">
                 </div>
                 <div class="flex items-end">
                     <label class="flex items-center cursor-pointer">
@@ -168,10 +173,8 @@
             </div>
 
             <!-- Start Button -->
-            <button 
-                id="startScraping" 
-                class="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 rounded-lg font-semibold text-lg hover:from-blue-700 hover:to-purple-700 transform hover:scale-105 transition duration-200 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
-            >
+            <button id="startScraping"
+                class="w-full bg-gradient-to-r from-blue-600 to-purple-600 text-white py-4 rounded-lg font-semibold text-lg hover:from-blue-700 hover:to-purple-700 transform hover:scale-105 transition duration-200 shadow-lg disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none">
                 <i class="fas fa-rocket mr-2"></i>
                 Start Scraping
             </button>
@@ -179,7 +182,9 @@
             <!-- Progress Section -->
             <div id="progressSection" class="mt-6 hidden">
                 <div class="bg-gray-200 rounded-full h-3 mb-4">
-                    <div id="progressBar" class="bg-gradient-to-r from-green-400 to-blue-500 h-3 rounded-full progress-bar" style="width: 0%"></div>
+                    <div id="progressBar"
+                        class="bg-gradient-to-r from-green-400 to-blue-500 h-3 rounded-full progress-bar"
+                        style="width: 0%"></div>
                 </div>
                 <div class="flex justify-between text-sm text-gray-600">
                     <span id="progressText">Initializing scraper...</span>
@@ -195,21 +200,17 @@
                     <i class="fas fa-table mr-2"></i>Latest Results
                 </h2>
                 <div class="flex gap-4">
-                    <button 
-                        id="downloadBtn" 
-                        class="bg-green-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-600 transform hover:scale-105 transition duration-200 shadow-md"
-                    >
+                    <button id="downloadBtn"
+                        class="bg-green-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-green-600 transform hover:scale-105 transition duration-200 shadow-md">
                         <i class="fas fa-download mr-2"></i>Download Excel
                     </button>
-                    <button 
-                        id="newSearchBtn" 
-                        class="bg-blue-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-600 transform hover:scale-105 transition duration-200 shadow-md"
-                    >
+                    <button id="newSearchBtn"
+                        class="bg-blue-500 text-white px-6 py-2 rounded-lg font-semibold hover:bg-blue-600 transform hover:scale-105 transition duration-200 shadow-md">
                         <i class="fas fa-plus mr-2"></i>New Search
                     </button>
                 </div>
             </div>
-            
+
             <div id="resultsContent" class="text-center text-gray-600">
                 <i class="fas fa-spinner fa-spin text-2xl mb-2"></i>
                 <p>Processing complete! Check files section below for download.</p>
@@ -223,22 +224,18 @@
                     <i class="fas fa-folder-open mr-2"></i>Generated Files
                 </h2>
                 <div class="flex gap-2">
-                    <button 
-                        id="clearMemoryBtn" 
+                    <button id="clearMemoryBtn"
                         class="bg-orange-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-orange-600 transform hover:scale-105 transition duration-200 shadow-md"
-                        title="Clear all memory data"
-                    >
+                        title="Clear all memory data">
                         <i class="fas fa-memory mr-2"></i>Clear Memory
                     </button>
-                    <button 
-                        id="refreshFiles" 
-                        class="bg-blue-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-600 transform hover:scale-105 transition duration-200 shadow-md"
-                    >
+                    <button id="refreshFiles"
+                        class="bg-blue-500 text-white px-4 py-2 rounded-lg font-semibold hover:bg-blue-600 transform hover:scale-105 transition duration-200 shadow-md">
                         <i class="fas fa-sync-alt mr-2"></i>Refresh
                     </button>
                 </div>
             </div>
-            
+
             <div id="filesList" class="space-y-3">
                 <!-- Files will be loaded here -->
             </div>
@@ -288,7 +285,7 @@
         // Keywords management
         function addKeyword(keyword) {
             if (!keyword.trim()) return;
-            
+
             keyword = keyword.trim();
             if (keywords.includes(keyword)) {
                 showMessage('Keyword already added', 'warning');
@@ -307,7 +304,7 @@
 
         function renderKeywords() {
             const keywordsList = document.getElementById('keywordsList');
-            
+
             if (keywords.length === 0) {
                 keywordsList.innerHTML = '<span class="text-gray-500 text-sm" id="keywordsPlaceholder">Add keywords by typing and pressing Enter...</span>';
                 return;
@@ -327,13 +324,13 @@
         }
 
         // Keyword input handlers
-        document.getElementById('keywordInput').addEventListener('keypress', function(e) {
+        document.getElementById('keywordInput').addEventListener('keypress', function (e) {
             if (e.key === 'Enter') {
                 addKeyword(this.value);
             }
         });
 
-        document.getElementById('addKeywordBtn').addEventListener('click', function() {
+        document.getElementById('addKeywordBtn').addEventListener('click', function () {
             addKeyword(document.getElementById('keywordInput').value);
         });
 
@@ -342,7 +339,7 @@
             try {
                 const response = await fetch('/api/status');
                 const status = await response.json();
-                
+
                 if (status.isProcessing) {
                     showProcessingOverlay(status);
                     startStatusChecking();
@@ -357,7 +354,7 @@
             document.getElementById('processingOverlay').classList.remove('hidden');
             document.getElementById('processingOverlay').classList.add('flex');
             document.getElementById('startScraping').disabled = true;
-            
+
             updateProcessingStatus(status);
         }
 
@@ -369,14 +366,12 @@
             const progress = status.progress || 0;
             const currentBusinessCount = status.currentBusinessCount || 0;
             const totalTargetCount = status.totalTargetCount || 0;
-            const currentBusinessName = status.currentBusinessName || '';
-            
+
             document.getElementById('keywordProgressBar').style.width = `${progress}%`;
             document.getElementById('progressCounter').textContent = `${currentBusinessCount} / ${totalTargetCount} businesses`;
             document.getElementById('elapsedTime').textContent = formatElapsedTime(status.elapsed || 0);
             document.getElementById('currentProcessQuery').textContent = `"${status.currentQuery || ''}"`;
-            document.getElementById('currentBusinessName').textContent = currentBusinessName || '-';
-            
+
             // Update keywords status list
             updateKeywordsStatusList(status);
         }
@@ -387,12 +382,12 @@
             const keywords = status.keywords || status.currentKeywords || [];
             const processedKeywords = status.processedKeywords || [];
             const currentIndex = status.currentKeywordIndex || 0;
-            
+
             if (keywords.length === 0) return;
-            
+
             statusList.innerHTML = keywords.map((keyword, index) => {
                 let statusIcon, statusClass, statusText;
-                
+
                 if (processedKeywords.includes(keyword)) {
                     statusIcon = '<i class="fas fa-check-circle text-green-500"></i>';
                     statusClass = 'text-green-600';
@@ -406,7 +401,7 @@
                     statusClass = 'text-gray-500';
                     statusText = 'Waiting';
                 }
-                
+
                 return `
                     <div class="flex items-center justify-between py-1 text-sm">
                         <span class="${statusClass}">${keyword}</span>
@@ -431,7 +426,7 @@
             const seconds = Math.floor(ms / 1000);
             const minutes = Math.floor(seconds / 60);
             const hours = Math.floor(minutes / 60);
-            
+
             if (hours > 0) {
                 return `${hours}h ${minutes % 60}m`;
             } else if (minutes > 0) {
@@ -446,23 +441,23 @@
             if (statusCheckInterval) {
                 clearInterval(statusCheckInterval);
             }
-            
+
             statusCheckInterval = setInterval(async () => {
                 try {
                     const response = await fetch('/api/status');
                     const status = await response.json();
-                    
+
                     if (status.isProcessing) {
                         updateProcessingStatus(status);
                     } else {
                         // Processing completed
                         clearInterval(statusCheckInterval);
                         hideProcessingOverlay();
-                        
+
                         const completedCount = status.completedFiles?.length || 0;
                         const timeoutFiles = status.completedFiles?.filter(f => f.timeout) || [];
                         const partialFiles = status.completedFiles?.filter(f => f.partial) || [];
-                        
+
                         if (completedCount > 0) {
                             if (timeoutFiles.length > 0 && partialFiles.length > 0) {
                                 showMessage(`Process completed with issues! Generated ${completedCount} files (${timeoutFiles.length} timeout, ${partialFiles.length} partial).`, 'warning');
@@ -489,13 +484,13 @@
             try {
                 const response = await fetch('/api/status');
                 const status = await response.json();
-                
+
                 if (!status.isProcessing) {
                     hideProcessingOverlay();
                     const completedCount = status.completedFiles?.length || 0;
                     const timeoutFiles = status.completedFiles?.filter(f => f.timeout) || [];
                     const partialFiles = status.completedFiles?.filter(f => f.partial) || [];
-                    
+
                     if (completedCount > 0) {
                         if (timeoutFiles.length > 0 && partialFiles.length > 0) {
                             showMessage(`Process completed with issues! Generated ${completedCount} files (${timeoutFiles.length} timeout, ${partialFiles.length} partial).`, 'warning');
@@ -526,7 +521,7 @@
         async function markAsFinished() {
             try {
                 showMessage('Stopping process and generating files...', 'info');
-                
+
                 const response = await fetch('/api/finish', {
                     method: 'POST',
                     headers: {
@@ -550,7 +545,7 @@
                 if (result.success) {
                     clearInterval(statusCheckInterval);
                     hideProcessingOverlay();
-                    
+
                     const completedCount = result.completedFiles?.length || 0;
                     if (completedCount > 0) {
                         showMessage(`Process stopped! Generated ${completedCount} files with processed data.`, 'success');
@@ -588,7 +583,7 @@
 
             try {
                 showMessage(`Starting scrape for ${keywords.length} keywords...`, 'info');
-                
+
                 const response = await fetch('/api/scrape', {
                     method: 'POST',
                     headers: {
@@ -616,7 +611,7 @@
                         completedFiles: []
                     });
                     startStatusChecking();
-                    
+
                 } else if (response.status === 429) {
                     // Another process is running
                     showMessage(result.error, 'warning');
@@ -643,9 +638,9 @@
             try {
                 const response = await fetch('/api/files');
                 const files = await response.json();
-                
+
                 const filesList = document.getElementById('filesList');
-                
+
                 if (files.length === 0) {
                     filesList.innerHTML = `
                         <div class="text-center py-8 text-gray-500">
@@ -701,7 +696,7 @@
                         </div>
                     </div>
                 `).join('');
-                
+
             } catch (error) {
                 showMessage(`Error loading files: ${error.message}`, 'error');
             }
@@ -740,7 +735,7 @@
                 if (!response.ok) {
                     throw new Error('Delete failed');
                 }
-                
+
                 const result = await response.json();
                 showMessage(result.message || 'File deleted successfully!', 'success');
                 loadFiles(); // Refresh the list
@@ -775,7 +770,7 @@
                 if (!response.ok) {
                     throw new Error('Failed to clear memory');
                 }
-                
+
                 const result = await response.json();
                 showMessage(result.message || 'Memory cleared successfully!', 'success');
                 loadFiles(); // Refresh the list
@@ -786,7 +781,7 @@
         });
 
         // Initialize on page load
-        document.addEventListener('DOMContentLoaded', function() {
+        document.addEventListener('DOMContentLoaded', function () {
             checkInitialStatus();
             loadFiles();
             renderKeywords();
@@ -796,4 +791,5 @@
         setInterval(loadFiles, 30000);
     </script>
 </body>
+
 </html>

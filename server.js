@@ -24,7 +24,6 @@ let processingState = {
     currentCount: 0,
     totalTargetCount: 0,
     currentBusinessCount: 0,
-    currentBusinessName: '',
     startTime: null,
     processId: null,
     completedFiles: []
@@ -90,9 +89,9 @@ async function detectLeftPanel(page) {
             // Must contain business list items
             const hasBusinessListings = await page.evaluate(element => {
                 return element.querySelector('a[href*="maps/place"]') ||
-                       element.querySelector('a[href*="/maps/search"]') ||
-                       element.querySelector('a[data-js-log-root]') ||
-                       element.querySelector('a[jsaction]');
+                    element.querySelector('a[href*="/maps/search"]') ||
+                    element.querySelector('a[data-js-log-root]') ||
+                    element.querySelector('a[jsaction]');
             }, el);
 
             if (!hasBusinessListings) continue;
@@ -105,10 +104,10 @@ async function detectLeftPanel(page) {
         }
     }
 
-    console.log("❌ Left panel NOT detected. Retrying in 3 seconds...");
+    console.log("❌ Left panel NOT detected. Retrying...");
 
     // 3️⃣ Retry logic (Google Maps sometimes loads slow)
-    await page.waitForDelay(3000);
+    await new Promise(resolve => setTimeout(resolve, 3000));
 
     for (const selector of knownSelectors) {
         const found = await page.$(selector);
@@ -136,13 +135,13 @@ async function extractContactInfoFromWebsite(url, visitInternalPages = true) {
         headless: "new",
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
     };
-    
+
     // In production, use Puppeteer's bundled Chromium
     if (process.platform !== 'win32') {
         console.log('🔧 Using Puppeteer bundled Chromium for contact extraction');
         // Don't set executablePath - let Puppeteer use its bundled Chromium
     }
-    
+
     const browser = await puppeteer.launch(launchOptions);
 
     try {
@@ -224,7 +223,7 @@ async function findInternalPages(page, baseUrl) {
                     try {
                         const url = new URL(href);
                         return url.hostname === baseHost &&
-                               keywords.some(keyword => href.toLowerCase().includes(keyword));
+                            keywords.some(keyword => href.toLowerCase().includes(keyword));
                     } catch { return false; }
                 })
                 .slice(0, 5); // Limit results
@@ -287,13 +286,13 @@ async function extractFromPage(page, url) {
                 .filter(email => {
                     const lower = email.toLowerCase();
                     return !lower.endsWith('.png') &&
-                           !lower.endsWith('.jpg') &&
-                           !lower.endsWith('.jpeg') &&
-                           !lower.includes('example') &&
-                           !lower.includes('test@') &&
-                           !lower.includes('noreply') &&
-                           !lower.includes('no-reply') &&
-                           lower.includes('.');
+                        !lower.endsWith('.jpg') &&
+                        !lower.endsWith('.jpeg') &&
+                        !lower.includes('example') &&
+                        !lower.includes('test@') &&
+                        !lower.includes('noreply') &&
+                        !lower.includes('no-reply') &&
+                        lower.includes('.');
                 })
         )];
 
@@ -369,15 +368,15 @@ async function scrapeGoogleMaps(searchQuery, targetCount, visitInternalPages = t
         headless: "new",
         args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
     };
-    
+
     // In production, use Puppeteer's bundled Chromium
     if (process.platform !== 'win32') {
         console.log('🔧 Using Puppeteer bundled Chromium for production');
         // Don't set executablePath - let Puppeteer use its bundled Chromium
     }
-    
+
     console.log('🚀 Launching browser with options:', JSON.stringify(launchOptions, null, 2));
-    
+
     const browser = await puppeteer.launch(launchOptions);
 
     try {
@@ -394,11 +393,12 @@ async function scrapeGoogleMaps(searchQuery, targetCount, visitInternalPages = t
         let lastCount = 0;
         let noNewResultsCount = 0;
 
-        for (let i = 0; i < MAX_SCROLLS; i++) {const panel = await detectLeftPanel(page);
-if (!panel) {
-    console.log("❌ Could not detect left panel. Stopping scroll.");
-    break;
-}
+        for (let i = 0; i < MAX_SCROLLS; i++) {
+            const panel = await detectLeftPanel(page);
+            if (!panel) {
+                console.log("❌ Could not detect left panel. Stopping scroll.");
+                break;
+            }
 
 
             await page.evaluate(el => el.scrollBy(0, el.scrollHeight), panel);
@@ -447,12 +447,12 @@ if (!panel) {
             // Check if processing was stopped
             if (stopProcessing || !processingState.isProcessing) {
                 console.log('🛑 Business processing stopped by user request');
-                
+
                 // Save the current results immediately if we have data
                 if (results.length > 0) {
                     console.log(`💾 Saving ${results.length} businesses for keyword: ${searchQuery}`);
                     scrapedData[searchQuery] = results;
-                    
+
                     // Generate filename for this keyword
                     const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
                     const filename = `leads_${searchQuery.replace(/[^a-zA-Z0-9]/g, '_')}_${timestamp}.xlsx`;
@@ -476,9 +476,6 @@ if (!panel) {
 
             const business = businesses[i];
             console.log(`🔍 Processing ${i + 1}/${targetCount}: ${business.name}`);
-            
-            // Update current business name in processing state
-            processingState.currentBusinessName = business.name;
 
             try {
                 const mapPage = await browser.newPage();
@@ -519,12 +516,12 @@ if (!panel) {
                 if (stopProcessing || !processingState.isProcessing) {
                     console.log('🛑 Processing stopped during business details extraction');
                     await mapPage.close();
-                    
+
                     // Save current results before breaking
                     if (results.length > 0) {
                         console.log(`💾 Saving ${results.length} businesses for keyword: ${searchQuery}`);
                         scrapedData[searchQuery] = results;
-                        
+
                         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
                         const filename = `leads_${searchQuery.replace(/[^a-zA-Z0-9]/g, '_')}_${timestamp}.xlsx`;
 
@@ -575,16 +572,16 @@ if (!panel) {
                 await mapPage.close();
             } catch (err) {
                 console.log(`⚠️ Error processing ${business.name}: ${err.message}`);
-                
+
                 // Check for specific timeout error
                 if (err.message && err.message.includes('Target.createTarget timed out')) {
                     console.log(`🔍 Timeout error detected for ${business.name}. Completing process gracefully...`);
-                    
+
                     // Store current results and mark as completed due to timeout
                     // This will trigger graceful completion in the main processing loop
                     throw new Error(`TIMEOUT_DETECTED: ${err.message}`);
                 }
-                
+
                 results.push({
                     name: business.name,
                     maps_link: business.link,
@@ -662,7 +659,6 @@ app.get('/api/status', (req, res) => {
         currentCount: processingState.currentCount,
         totalTargetCount: processingState.totalTargetCount,
         currentBusinessCount: processingState.currentBusinessCount,
-        currentBusinessName: processingState.currentBusinessName,
         startTime: processingState.startTime,
         processId: processingState.processId,
         completedFiles: processingState.completedFiles,
@@ -774,11 +770,11 @@ app.post('/api/scrape', async (req, res) => {
                 // Check if this is a timeout error that should trigger graceful completion
                 if (err.message && err.message.includes('TIMEOUT_DETECTED:')) {
                     console.log(`🔍 Timeout detected for "${keyword}". Storing partial results and completing process...`);
-                    
+
                     // Store whatever results we have so far
                     if (results && results.length > 0) {
                         scrapedData[keyword] = results;
-                        
+
                         // Generate filename for this keyword (for frontend display)
                         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
                         const filename = `leads_${keyword.replace(/[^a-zA-Z0-9]/g, '_')}_${timestamp}.xlsx`;
@@ -795,10 +791,10 @@ app.post('/api/scrape', async (req, res) => {
 
                         console.log(`✅ Partial results for "${keyword}" stored: ${results.length} businesses (timeout)`);
                     }
-                    
+
                     // Mark keyword as processed
                     processingState.processedKeywords.push(keyword);
-                    
+
                     // Break out of the loop to stop processing remaining keywords
                     console.log(`🛑 Stopping remaining keyword processing due to timeout`);
                     break;
@@ -853,21 +849,21 @@ app.post('/api/finish', async (req, res) => {
 
     try {
         console.log('🛑 Manual finish requested - stopping process immediately...');
-        
+
         // Set the global stop flag to immediately terminate processing
         stopProcessing = true;
-        
+
         // Wait a moment for any current processing to complete and save data
         await new Promise(resolve => setTimeout(resolve, 2000));
-        
+
         processingState.isProcessing = false;
-        
+
         const processedKeywords = [...processingState.processedKeywords];
         console.log(`📊 Processing stopped. Processed keywords: ${processedKeywords.join(', ')}`);
-        
+
         // Generate completion response
         const completedFiles = processingState.completedFiles || [];
-        
+
         res.json({
             success: true,
             message: 'Process stopped successfully',
@@ -877,7 +873,7 @@ app.post('/api/finish', async (req, res) => {
 
     } catch (error) {
         console.error('❌ Error stopping process:', error);
-        
+
         // Clear processing state on error
         processingState.isProcessing = false;
         stopProcessing = false;
@@ -889,7 +885,7 @@ app.post('/api/finish', async (req, res) => {
         processingState.currentBusinessName = '';
         processingState.startTime = null;
         processingState.processId = null;
-        
+
         res.status(500).json({ error: 'Error stopping process' });
     }
 });
@@ -969,7 +965,7 @@ app.get('/api/files', (req, res) => {
 // Download Excel file from memory
 app.get('/api/download/:keyword', async (req, res) => {
     const keyword = req.params.keyword;
-    
+
     if (!scrapedData[keyword]) {
         return res.status(404).json({ error: 'Data not found for this keyword' });
     }
@@ -978,7 +974,7 @@ app.get('/api/download/:keyword', async (req, res) => {
         const buffer = await createExcelBuffer(scrapedData[keyword]);
         const timestamp = new Date().toISOString().replace(/[:.]/g, '-').split('T')[0];
         const filename = `leads_${keyword.replace(/[^a-zA-Z0-9]/g, '_')}_${timestamp}.xlsx`;
-        
+
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
         res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
         res.send(buffer);
@@ -1003,7 +999,7 @@ app.get('/api/download/file/:filename', (req, res) => {
 // Clear memory data
 app.delete('/api/memory/:keyword', (req, res) => {
     const keyword = req.params.keyword;
-    
+
     if (scrapedData[keyword]) {
         delete scrapedData[keyword];
         processingState.completedFiles = processingState.completedFiles.filter(f => f.keyword !== keyword);
@@ -1041,7 +1037,7 @@ app.delete('/api/files/:filename', (req, res) => {
 app.listen(PORT, '0.0.0.0', () => {
     console.log(`🚀 LeadPilot System live at http://localhost:3000`);
     console.log(`📁 Excel files stored in: ${EXCEL_DIR}`);
-    
+
     // Production environment info
     if (process.platform !== 'win32') {
         console.log('🔧 Production environment detected');
