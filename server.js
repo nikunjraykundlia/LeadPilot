@@ -532,7 +532,14 @@ async function extractFromPage(page, url) {
 async function scrapeGoogleMaps(searchQuery, targetCount, visitInternalPages = true) {
     const launchOptions = {
         headless: "new",
-        args: ['--no-sandbox', '--disable-setuid-sandbox', '--disable-dev-shm-usage', '--disable-gpu']
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--disable-blink-features=AutomationControlled',
+            '--window-size=1920,1080'
+        ]
     };
 
     // In production, use Puppeteer's bundled Chromium
@@ -547,12 +554,88 @@ async function scrapeGoogleMaps(searchQuery, targetCount, visitInternalPages = t
 
     try {
         const page = await browser.newPage();
+
+        // Set a realistic user agent to avoid detection
+        await page.setUserAgent('Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+
+        // Set viewport
+        await page.setViewport({ width: 1920, height: 1080 });
+
+        // Override webdriver detection
+        await page.evaluateOnNewDocument(() => {
+            Object.defineProperty(navigator, 'webdriver', { get: () => undefined });
+        });
+
         console.log(`🌐 Navigating to Google Maps for: ${searchQuery}`);
 
         await page.goto(`https://www.google.com/maps/search/${encodeURIComponent(searchQuery)}`, {
             waitUntil: 'networkidle2',
             timeout: 90000
         });
+
+        // Handle Google consent dialog if it appears
+        console.log('🔍 Checking for consent dialogs...');
+        try {
+            // Try multiple consent button selectors
+            const consentSelectors = [
+                'button[aria-label="Accept all"]',
+                'button[aria-label="Accept All"]',
+                'button[aria-label="Reject all"]',
+                'form[action*="consent"] button',
+                '[data-text*="Accept all"]',
+                'button:has-text("Accept all")',
+                '[aria-label*="consent"] button',
+                '.VfPpkd-LgbsSe[data-mdc-dialog-action="accept"]'
+            ];
+
+            for (const selector of consentSelectors) {
+                try {
+                    const consentBtn = await page.$(selector);
+                    if (consentBtn) {
+                        await consentBtn.click();
+                        console.log(`✅ Clicked consent button: ${selector}`);
+                        await new Promise(resolve => setTimeout(resolve, 2000));
+                        break;
+                    }
+                } catch (e) {
+                    continue;
+                }
+            }
+        } catch (consentError) {
+            console.log('ℹ️ No consent dialog found or already dismissed');
+        }
+
+        // Wait extra time for page to fully render
+        console.log('⏳ Waiting for page to fully load...');
+        await new Promise(resolve => setTimeout(resolve, 5000));
+
+        // Debug: Check what's on the page
+        const pageTitle = await page.title();
+        console.log(`📄 Page title: ${pageTitle}`);
+
+        // Check for business anchors before scrolling
+        const initialBusinessCount = await safeEvaluate(page, () =>
+            document.querySelectorAll('a.hfpxzc').length
+        );
+        console.log(`📊 Initial business anchor count: ${initialBusinessCount}`);
+
+        // If no businesses found, save a screenshot for debugging
+        if (initialBusinessCount === 0) {
+            console.log('⚠️ No business anchors found initially. Debugging page content...');
+            const bodyText = await safeEvaluate(page, () =>
+                document.body.innerText.substring(0, 500)
+            );
+            console.log(`📝 Page content preview: ${bodyText}`);
+
+            // Try waiting more
+            console.log('⏳ Waiting additional time for content to load...');
+            await new Promise(resolve => setTimeout(resolve, 5000));
+
+            const retryCount = await safeEvaluate(page, () =>
+                document.querySelectorAll('a.hfpxzc').length
+            );
+            console.log(`📊 Business anchor count after extra wait: ${retryCount}`);
+        }
 
         console.log('📜 Scrolling left panel to load businesses...');
         const MAX_SCROLLS = 20;
