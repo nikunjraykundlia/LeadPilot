@@ -11,6 +11,42 @@ const app = express();
 app.use(bodyParser.json());
 app.use(express.static('public'));
 
+// Helper function to check if page is still valid (not detached)
+async function isPageValid(page) {
+    try {
+        if (!page || page.isClosed()) return false;
+        // Try a simple evaluation to check if the frame is still attached
+        await page.evaluate(() => true);
+        return true;
+    } catch (error) {
+        if (error.message.includes('detached') ||
+            error.message.includes('closed') ||
+            error.message.includes('destroyed') ||
+            error.message.includes('Target closed')) {
+            return false;
+        }
+        // For other errors, assume the page might still be valid
+        return true;
+    }
+}
+
+// Safe page.evaluate wrapper that checks for detached frames
+async function safeEvaluate(page, fn, ...args) {
+    try {
+        if (!await isPageValid(page)) {
+            throw new Error('Page is no longer valid (detached or closed)');
+        }
+        return await page.evaluate(fn, ...args);
+    } catch (error) {
+        if (error.message.includes('detached') ||
+            error.message.includes('closed') ||
+            error.message.includes('destroyed')) {
+            throw new Error(`PAGE_DETACHED: ${error.message}`);
+        }
+        throw error;
+    }
+}
+
 const PORT = 3000;
 const EXCEL_DIR = path.join(__dirname, 'excel_files');
 
@@ -41,6 +77,12 @@ if (!fs.existsSync(EXCEL_DIR)) {
 }
 // GOOGLE MAPS LEFT PANEL DETECTOR (Known Selectors + Structure Detection + Retry)
 async function detectLeftPanel(page) {
+    // Check if page is still valid before proceeding
+    if (!await isPageValid(page)) {
+        console.log('⚠️ Page became invalid. Cannot detect left panel.');
+        return null;
+    }
+
     // 1️⃣ Known selectors (fast path)
     const knownSelectors = [
         'div[role="feed"]',
@@ -53,72 +95,97 @@ async function detectLeftPanel(page) {
         'div[aria-label][class*="scroll"]'
     ];
 
-    for (const selector of knownSelectors) {
-        const found = await page.$(selector);
-        if (found) {
-            console.log(`✅ Left panel detected (known selector): ${selector}`);
-            return found;
+    try {
+        for (const selector of knownSelectors) {
+            const found = await page.$(selector);
+            if (found) {
+                console.log(`✅ Left panel detected (known selector): ${selector}`);
+                return found;
+            }
         }
-    }
 
-    console.log("⚠️ Known selectors failed. Switching to structure-based detection...");
+        console.log("⚠️ Known selectors failed. Switching to structure-based detection...");
 
-    // 2️⃣ Structure-based detection (permanent fallback)
-    const allContainers = await page.$$('div, section');
+        // 2️⃣ Structure-based detection (permanent fallback)
+        const allContainers = await page.$$('div, section');
 
-    for (const el of allContainers) {
-        try {
-            const rect = await el.boundingBox();
-            if (!rect) continue;
+        for (const el of allContainers) {
+            try {
+                const rect = await el.boundingBox();
+                if (!rect) continue;
 
-            // Must be tall enough but not fullscreen
-            if (rect.height < 250 || rect.height > 1200) continue;
+                // Must be tall enough but not fullscreen
+                if (rect.height < 250 || rect.height > 1200) continue;
 
-            // Check scrollability
-            const isScrollable = await page.evaluate(element => {
-                const style = window.getComputedStyle(element);
-                return (
-                    style.overflowY === 'scroll' ||
-                    style.overflowY === 'auto' ||
-                    element.scrollHeight > element.clientHeight + 40
-                );
-            }, el);
+                // Check scrollability - use safeEvaluate
+                const isScrollable = await safeEvaluate(page, element => {
+                    const style = window.getComputedStyle(element);
+                    return (
+                        style.overflowY === 'scroll' ||
+                        style.overflowY === 'auto' ||
+                        element.scrollHeight > element.clientHeight + 40
+                    );
+                }, el);
 
-            if (!isScrollable) continue;
+                if (!isScrollable) continue;
 
-            // Must contain business list items
-            const hasBusinessListings = await page.evaluate(element => {
-                return element.querySelector('a[href*="maps/place"]') ||
-                    element.querySelector('a[href*="/maps/search"]') ||
-                    element.querySelector('a[data-js-log-root]') ||
-                    element.querySelector('a[jsaction]');
-            }, el);
+                // Must contain business list items - use safeEvaluate
+                const hasBusinessListings = await safeEvaluate(page, element => {
+                    return element.querySelector('a[href*="maps/place"]') ||
+                        element.querySelector('a[href*="/maps/search"]') ||
+                        element.querySelector('a[data-js-log-root]') ||
+                        element.querySelector('a[jsaction]');
+                }, el);
 
-            if (!hasBusinessListings) continue;
+                if (!hasBusinessListings) continue;
 
-            console.log("✅ Left panel detected (structure-based).");
-            return el;
+                console.log("✅ Left panel detected (structure-based).");
+                return el;
 
-        } catch (err) {
-            continue;
+            } catch (err) {
+                // Check if this is a detached frame error
+                if (err.message && (err.message.includes('detached') ||
+                    err.message.includes('PAGE_DETACHED') ||
+                    err.message.includes('closed'))) {
+                    console.log('⚠️ Page detached during panel detection.');
+                    return null;
+                }
+                continue;
+            }
         }
-    }
 
-    console.log("❌ Left panel NOT detected. Retrying...");
+        console.log("❌ Left panel NOT detected. Retrying...");
 
-    // 3️⃣ Retry logic (Google Maps sometimes loads slow)
-    await new Promise(resolve => setTimeout(resolve, 3000));
+        // 3️⃣ Retry logic (Google Maps sometimes loads slow)
+        await new Promise(resolve => setTimeout(resolve, 3000));
 
-    for (const selector of knownSelectors) {
-        const found = await page.$(selector);
-        if (found) {
-            console.log(`🔁 Retried and detected left panel using: ${selector}`);
-            return found;
+        // Check page validity again before retry
+        if (!await isPageValid(page)) {
+            console.log('⚠️ Page became invalid during retry wait.');
+            return null;
         }
-    }
 
-    console.log("😓 Panel detection failed even after retry.");
-    return null;
+        for (const selector of knownSelectors) {
+            const found = await page.$(selector);
+            if (found) {
+                console.log(`🔁 Retried and detected left panel using: ${selector}`);
+                return found;
+            }
+        }
+
+        console.log("😓 Panel detection failed even after retry.");
+        return null;
+
+    } catch (err) {
+        // Catch any detached frame errors at the top level
+        if (err.message && (err.message.includes('detached') ||
+            err.message.includes('PAGE_DETACHED') ||
+            err.message.includes('closed'))) {
+            console.log('⚠️ Page detached during panel detection (top-level).');
+            return null;
+        }
+        throw err;
+    }
 }
 
 
@@ -394,23 +461,45 @@ async function scrapeGoogleMaps(searchQuery, targetCount, visitInternalPages = t
         let noNewResultsCount = 0;
 
         for (let i = 0; i < MAX_SCROLLS; i++) {
+            // Check if page is still valid before each scroll iteration
+            if (!await isPageValid(page)) {
+                console.log('⚠️ Page became invalid during scrolling. Breaking scroll loop.');
+                break;
+            }
+
             const panel = await detectLeftPanel(page);
             if (!panel) {
                 console.log("❌ Could not detect left panel. Stopping scroll.");
                 break;
             }
 
-
-            await page.evaluate(el => el.scrollBy(0, el.scrollHeight), panel);
-            console.log(`🔽 Scrolled panel: ${i + 1}`);
+            try {
+                await safeEvaluate(page, el => el.scrollBy(0, el.scrollHeight), panel);
+                console.log(`🔽 Scrolled panel: ${i + 1}`);
+            } catch (scrollError) {
+                if (scrollError.message.includes('PAGE_DETACHED')) {
+                    console.log('⚠️ Page detached during scroll. Breaking scroll loop.');
+                    break;
+                }
+                throw scrollError;
+            }
 
             const delay = targetCount < 20 ? 3000 : 15000;
             await new Promise(resolve => setTimeout(resolve, delay));
 
-            const currentCount = await page.evaluate(() =>
-                document.querySelectorAll('a.hfpxzc').length
-            );
-            console.log(`📦 Businesses loaded: ${currentCount}`);
+            let currentCount = 0;
+            try {
+                currentCount = await safeEvaluate(page, () =>
+                    document.querySelectorAll('a.hfpxzc').length
+                );
+                console.log(`📦 Businesses loaded: ${currentCount}`);
+            } catch (countError) {
+                if (countError.message.includes('PAGE_DETACHED')) {
+                    console.log('⚠️ Page detached during count. Breaking scroll loop.');
+                    break;
+                }
+                throw countError;
+            }
 
             if (currentCount >= targetCount) {
                 console.log(`✅ Target of ${targetCount} businesses reached.`);
@@ -432,13 +521,28 @@ async function scrapeGoogleMaps(searchQuery, targetCount, visitInternalPages = t
             lastCount = currentCount;
         }
 
-        const businesses = await page.evaluate(() => {
-            const anchors = [...document.querySelectorAll('a.hfpxzc')];
-            return anchors.map(a => ({
-                name: a.getAttribute('aria-label') || '',
-                link: a.href
-            }));
-        });
+        // Check if page is still valid before extracting businesses
+        if (!await isPageValid(page)) {
+            console.log('⚠️ Page became invalid. Returning empty results.');
+            return [];
+        }
+
+        let businesses = [];
+        try {
+            businesses = await safeEvaluate(page, () => {
+                const anchors = [...document.querySelectorAll('a.hfpxzc')];
+                return anchors.map(a => ({
+                    name: a.getAttribute('aria-label') || '',
+                    link: a.href
+                }));
+            });
+        } catch (extractError) {
+            if (extractError.message.includes('PAGE_DETACHED')) {
+                console.log('⚠️ Page detached during business extraction. Returning empty results.');
+                return [];
+            }
+            throw extractError;
+        }
 
         console.log(`📦 Total businesses found: ${businesses.length}`);
 
