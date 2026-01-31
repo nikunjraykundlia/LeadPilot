@@ -83,39 +83,112 @@ async function detectLeftPanel(page) {
         return null;
     }
 
-    // 1️⃣ Known selectors (fast path)
+    // 1️⃣ Known selectors (fast path) - Updated with current Google Maps selectors
     const knownSelectors = [
+        // Primary selectors for business results panel
         'div[role="feed"]',
-        'div[role="region"]',
+        'div[role="main"] div[role="region"]',
+        // More specific class-based selectors (these change frequently but are worth trying)
         'div.m6QErb.DxyBCb.kA9KIf.dS8AEf',
         'div.m6QErb.tLjsW.eKbjU',
+        'div.m6QErb.WNBkOb',
+        'div.m6QErb',
+        // Generic scrollable containers
         'div.section-scrollbox',
-        'div.scrollable-pane',
+        'div[class*="scrollbox"]',
         'div[jscontroller][jsaction][aria-label]',
-        'div[aria-label][class*="scroll"]'
+        // Parent of business listings
+        'div.Nv2PK',
+        // Fallback attribute-based selectors
+        'div[data-results-container]',
+        'div[aria-label*="Results"]',
+        'div[aria-label*="results"]'
     ];
 
     try {
+        // First, wait a bit for the page to fully load
+        await new Promise(resolve => setTimeout(resolve, 2000));
+
         for (const selector of knownSelectors) {
-            const found = await page.$(selector);
-            if (found) {
-                console.log(`✅ Left panel detected (known selector): ${selector}`);
-                return found;
+            try {
+                const found = await page.$(selector);
+                if (found) {
+                    // Verify this element actually contains business listings
+                    const hasBusinesses = await safeEvaluate(page, el => {
+                        return el.querySelector('a.hfpxzc') !== null ||
+                            el.querySelectorAll('a[href*="maps/place"]').length > 0;
+                    }, found);
+
+                    if (hasBusinesses) {
+                        console.log(`✅ Left panel detected (known selector): ${selector}`);
+                        return found;
+                    }
+                }
+            } catch (selectorErr) {
+                continue;
             }
         }
 
         console.log("⚠️ Known selectors failed. Switching to structure-based detection...");
 
-        // 2️⃣ Structure-based detection (permanent fallback)
-        const allContainers = await page.$$('div, section');
+        // 2️⃣ Find the scrollable parent of business listing anchors
+        const businessAnchor = await page.$('a.hfpxzc');
+        if (businessAnchor) {
+            // Try to find the scrollable parent
+            const scrollableParent = await safeEvaluate(page, anchor => {
+                let parent = anchor.parentElement;
+                let attempts = 0;
+                while (parent && attempts < 15) {
+                    const style = window.getComputedStyle(parent);
+                    const isScrollable = style.overflowY === 'scroll' ||
+                        style.overflowY === 'auto' ||
+                        parent.scrollHeight > parent.clientHeight + 50;
+                    if (isScrollable && parent.scrollHeight > 400) {
+                        return true; // Found scrollable parent
+                    }
+                    parent = parent.parentElement;
+                    attempts++;
+                }
+                return false;
+            }, businessAnchor);
+
+            if (scrollableParent) {
+                // Get the actual scrollable element
+                const panel = await page.evaluateHandle(anchor => {
+                    let parent = anchor.parentElement;
+                    let attempts = 0;
+                    while (parent && attempts < 15) {
+                        const style = window.getComputedStyle(parent);
+                        const isScrollable = style.overflowY === 'scroll' ||
+                            style.overflowY === 'auto' ||
+                            parent.scrollHeight > parent.clientHeight + 50;
+                        if (isScrollable && parent.scrollHeight > 400) {
+                            return parent;
+                        }
+                        parent = parent.parentElement;
+                        attempts++;
+                    }
+                    return null;
+                }, businessAnchor);
+
+                if (panel) {
+                    console.log("✅ Left panel detected (via business anchor parent).");
+                    return panel;
+                }
+            }
+        }
+
+        // 3️⃣ Structure-based detection (permanent fallback)
+        const allContainers = await page.$$('div');
 
         for (const el of allContainers) {
             try {
                 const rect = await el.boundingBox();
                 if (!rect) continue;
 
-                // Must be tall enough but not fullscreen
-                if (rect.height < 250 || rect.height > 1200) continue;
+                // Must be reasonably sized (relaxed constraints)
+                if (rect.height < 200 || rect.height > 2000) continue;
+                if (rect.width < 200 || rect.width > 600) continue;
 
                 // Check scrollability - use safeEvaluate
                 const isScrollable = await safeEvaluate(page, element => {
@@ -129,12 +202,12 @@ async function detectLeftPanel(page) {
 
                 if (!isScrollable) continue;
 
-                // Must contain business list items - use safeEvaluate
+                // Must contain business list items - use safeEvaluate with updated selectors
                 const hasBusinessListings = await safeEvaluate(page, element => {
-                    return element.querySelector('a[href*="maps/place"]') ||
-                        element.querySelector('a[href*="/maps/search"]') ||
-                        element.querySelector('a[data-js-log-root]') ||
-                        element.querySelector('a[jsaction]');
+                    return element.querySelector('a.hfpxzc') ||
+                        element.querySelector('a[href*="maps/place"]') ||
+                        element.querySelector('div[role="article"]') ||
+                        element.querySelector('div.Nv2PK');
                 }, el);
 
                 if (!hasBusinessListings) continue;
@@ -154,10 +227,10 @@ async function detectLeftPanel(page) {
             }
         }
 
-        console.log("❌ Left panel NOT detected. Retrying...");
+        console.log("❌ Left panel NOT detected. Retrying with extended wait...");
 
-        // 3️⃣ Retry logic (Google Maps sometimes loads slow)
-        await new Promise(resolve => setTimeout(resolve, 3000));
+        // 4️⃣ Retry logic with longer wait (Google Maps sometimes loads slow)
+        await new Promise(resolve => setTimeout(resolve, 5000));
 
         // Check page validity again before retry
         if (!await isPageValid(page)) {
@@ -165,11 +238,37 @@ async function detectLeftPanel(page) {
             return null;
         }
 
+        // Try known selectors again
         for (const selector of knownSelectors) {
-            const found = await page.$(selector);
-            if (found) {
-                console.log(`🔁 Retried and detected left panel using: ${selector}`);
-                return found;
+            try {
+                const found = await page.$(selector);
+                if (found) {
+                    const hasBusinesses = await safeEvaluate(page, el => {
+                        return el.querySelector('a.hfpxzc') !== null ||
+                            el.querySelectorAll('a[href*="maps/place"]').length > 0;
+                    }, found);
+
+                    if (hasBusinesses) {
+                        console.log(`🔁 Retried and detected left panel using: ${selector}`);
+                        return found;
+                    }
+                }
+            } catch (selectorErr) {
+                continue;
+            }
+        }
+
+        // 5️⃣ Last resort: Try to find any scrollable area with the business anchors
+        const businessCount = await safeEvaluate(page, () =>
+            document.querySelectorAll('a.hfpxzc').length
+        );
+
+        if (businessCount > 0) {
+            console.log(`📊 Found ${businessCount} business anchors. Using document body as fallback panel.`);
+            // Return the main scrollable area
+            const mainArea = await page.$('div[role="main"]') || await page.$('body');
+            if (mainArea) {
+                return mainArea;
             }
         }
 
