@@ -47,7 +47,7 @@ async function safeEvaluate(page, fn, ...args) {
     }
 }
 
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const EXCEL_DIR = path.join(__dirname, 'excel_files');
 
 // Global processing state
@@ -1300,6 +1300,47 @@ app.delete('/api/memory', (req, res) => {
     scrapedData = {};
     processingState.completedFiles = [];
     res.json({ message: 'All memory data cleared' });
+});
+
+// ========================
+// n8n AUTOMATION ENDPOINTS
+// ========================
+
+// Get scraped data as JSON for a specific keyword (for n8n/automation)
+app.get('/api/data/:keyword', (req, res) => {
+    const keyword = req.params.keyword;
+
+    if (!scrapedData[keyword]) {
+        return res.status(404).json({
+            success: false,
+            error: 'No data found for this keyword'
+        });
+    }
+
+    res.json({
+        success: true,
+        keyword: keyword,
+        count: scrapedData[keyword].length,
+        data: scrapedData[keyword]
+    });
+});
+
+// Get all scraped data as JSON (for n8n/automation)
+app.get('/api/data', (req, res) => {
+    const allData = {};
+    let totalCount = 0;
+
+    for (const keyword in scrapedData) {
+        allData[keyword] = scrapedData[keyword];
+        totalCount += scrapedData[keyword].length;
+    }
+
+    res.json({
+        success: true,
+        totalKeywords: Object.keys(allData).length,
+        totalBusinesses: totalCount,
+        data: allData
+    });
 });
 
 // Delete Excel file (legacy disk files)
